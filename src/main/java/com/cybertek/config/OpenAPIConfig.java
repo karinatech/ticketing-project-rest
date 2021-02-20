@@ -12,21 +12,24 @@ import java.util.Arrays;
 
 @Configuration
 public class OpenAPIConfig {
+
     @Bean
     public OpenAPI customOpenApi(){
-        SecurityScheme securityItem = new SecurityScheme();
-        securityItem.setType(SecurityScheme.Type.HTTP);
-        securityItem.setScheme("bearer");
-        securityItem.setBearerFormat("JWT");
-        securityItem.setIn(SecurityScheme.In.HEADER);
-        securityItem.setName("Authorization");
-        Info infoVersion=new Info().title("Ticketing application").version("snapshot");
-        SecurityRequirement seecurityRequirement=new SecurityRequirement().addList("bearer-jwt", Arrays.asList("read","write"));
+
+        SecurityScheme securitySchemeItem = new SecurityScheme();
+        securitySchemeItem.setType(SecurityScheme.Type.HTTP);
+        securitySchemeItem.setScheme("bearer");
+        securitySchemeItem.setBearerFormat("JWT");
+        securitySchemeItem.setIn(SecurityScheme.In.HEADER);
+        securitySchemeItem.setName("Authorization");
+        Info infoVersion = new Info().title("Kari's project").version("snapshot");
+        SecurityRequirement securityItem = new SecurityRequirement().addList("bearer-jwt", Arrays.asList("read","write"));
+
         return new OpenAPI()
                 .components(new Components()
-                .addSecuritySchemes("bearer-jwt",securityItem))
+                        .addSecuritySchemes("bearer-jwt",securitySchemeItem))
                 .info(infoVersion)
-                .addSecurityItem(seecurityRequirement);
-
+                .addSecurityItem(securityItem);
     }
+
 }

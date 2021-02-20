@@ -2,9 +2,12 @@ package com.cybertek.implementation;
 
 import com.cybertek.dto.ProjectDTO;
 import com.cybertek.dto.TaskDTO;
+import com.cybertek.entity.Project;
 import com.cybertek.entity.Task;
 import com.cybertek.entity.User;
 import com.cybertek.enums.Status;
+import com.cybertek.exception.TicketingProjectException;
+import com.cybertek.mapper.MapperUtil;
 import com.cybertek.mapper.ProjectMapper;
 import com.cybertek.mapper.TaskMapper;
 import com.cybertek.repository.TaskRepository;
@@ -21,132 +24,125 @@ import java.util.stream.Collectors;
 @Service
 public class TaskServiceImpl implements TaskService {
 
-    TaskRepository taskRepository;
-    TaskMapper taskMapper;
-    ProjectMapper projectMapper;
-    UserRepository userRepository;
+    private TaskRepository taskRepository;
+    private MapperUtil mapperUtil;
+    private UserRepository userRepository;
 
-    public TaskServiceImpl(TaskRepository taskRepository, TaskMapper taskMapper, ProjectMapper projectMapper, UserRepository userRepository) {
+    public TaskServiceImpl(TaskRepository taskRepository, MapperUtil mapperUtil, UserRepository userRepository) {
         this.taskRepository = taskRepository;
-        this.taskMapper = taskMapper;
-        this.projectMapper = projectMapper;
+        this.mapperUtil = mapperUtil;
         this.userRepository = userRepository;
     }
 
     @Override
-    public TaskDTO findById(Long id) {
-        Optional<Task> task = taskRepository.findById(id);
-        if(task.isPresent()){
-            return taskMapper.convertToDto(task.get());
+    public TaskDTO findById(Long id) throws TicketingProjectException {
+        Task task = taskRepository.findById(id).orElseThrow(() -> new TicketingProjectException("Task does not excist"));
+
+        return mapperUtil.convert(task, new TaskDTO());
+
+    }
+
+        @Override
+        public List<TaskDTO> listAllTasks(){
+            List<Task> list = taskRepository.findAll();
+
+            return list.stream().map(obj -> mapperUtil.convert(obj,new TaskDTO())).collect(Collectors.toList());
         }
-        return null;
-    }
 
-    @Override
-    public List<TaskDTO> listAllTasks() {
-        List<Task> list = taskRepository.findAll();
+        @Override
+        public TaskDTO save(TaskDTO task) {
+            task.setTaskStatus(Status.OPEN);
+            task.setAssignedDate(LocalDate.now());
+            Task task1 = mapperUtil.convert(task,new Task());
+            Task save=taskRepository.save(task1);
+            return mapperUtil.convert(save,new TaskDTO());
+        }
 
-        return list.stream().map(taskMapper::convertToDto).collect(Collectors.toList());
+        @Override
+        public TaskDTO update(TaskDTO dto) throws TicketingProjectException {
+        taskRepository.findById(dto.getId()).orElseThrow(()-> new TicketingProjectException("Task doesnt exist"));
+        Task convertedTask=mapperUtil.convert(dto,new Task());
+        Task save =taskRepository.save(convertedTask);
+            return mapperUtil.convert(save,new TaskDTO());
+        }
 
-        //return list.stream().map(obj ->{return taskMapper.convertToDto(obj);}).collect(Collectors.toList());
+        @Override
+        public void delete(long id) throws TicketingProjectException {
+      Task foundTask = taskRepository.findById(id).orElseThrow(()-> new TicketingProjectException("Task doeesnt xcist"));
+      foundTask.setIsDeleted(true);
+      taskRepository.save(foundTask);
 
-    }
+        }
 
-    @Override
-    public Task save(TaskDTO dto) {
-        dto.setTaskStatus(Status.OPEN);
-        dto.setAssignedDate(LocalDate.now());
-        Task task = taskMapper.convertToEntity(dto);
-        return taskRepository.save(task);
-    }
+        @Override
+        public int totalNonCompletedTasks(String projectCode) {
+            return taskRepository.totalNonCompletedTasks(projectCode);
+        }
 
-    @Override
-    public void update(TaskDTO dto) {
-        Optional<Task> task = taskRepository.findById(dto.getId());
-        Task convertedTask = taskMapper.convertToEntity(dto);
+        @Override
+        public int totalCompletedTasks(String projectCode) {
+            return taskRepository.totalCompletedTasks(projectCode);
+        }
 
-        if(task.isPresent()){
-            convertedTask.setId(task.get().getId());
-            convertedTask.setTaskStatus(task.get().getTaskStatus());
-            convertedTask.setAssignedDate(task.get().getAssignedDate());
-            taskRepository.save(convertedTask);
+        @Override
+        public void deleteByProject(ProjectDTO project) {
+
+            List<TaskDTO> taskDTOS = listAllByProject(project);
+            taskDTOS.forEach(taskDTO -> {
+                try {
+                    delete(taskDTO.getId());
+                } catch (TicketingProjectException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+
+
+        public List<TaskDTO> listAllByProject(ProjectDTO project){
+
+            List<Task> list = taskRepository.findAllByProject(mapperUtil.convert(project,new Project()));
+
+            return list.stream().map(obj -> {
+                return mapperUtil.convert(obj,new TaskDTO());
+            }).collect(Collectors.toList());
+        }
+
+        @Override
+        public List<TaskDTO> listAllTasksByStatusIsNot(Status status) throws TicketingProjectException {
+
+            String id = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findById(Long.parseLong(id)).orElseThrow(()-> new TicketingProjectException("This useer doesnt exciist"));
+            List<Task> list = taskRepository.findAllByTaskStatusIsNotAndAssignedEmployee(status,user);
+            return list.stream().map(obj->mapperUtil.convert(obj,new TaskDTO())).collect(Collectors.toList());
+        }
+
+        @Override
+        public List<TaskDTO> listAllTasksByProjectManager() throws TicketingProjectException {
+            String id = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findById(Long.parseLong(id)).orElseThrow(()-> new TicketingProjectException("This user does not excist "));
+            List<Task> tasks = taskRepository.findAllByProjectAssignedManager(user);
+            return  tasks.stream().map(obj -> mapperUtil.convert(obj,new TaskDTO())).collect(Collectors.toList());
+        }
+
+        @Override
+        public TaskDTO updateStatus(TaskDTO dto) throws TicketingProjectException {
+            Task task = taskRepository.findById(dto.getId()).orElseThrow(()-> new TicketingProjectException("Task doesnt excist"));
+            task.setTaskStatus(dto.getTaskStatus());
+            Task save=taskRepository.save(task);
+            return mapperUtil.convert(save,new TaskDTO());
+        }
+
+//        @Override
+//        public List<TaskDTO> listAllTasksByStatus(Status status) {
+//            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+//            User user = userRepository.findByUserName(username);
+//            List<Task> list = taskRepository.findAllByTaskStatusAndAssignedEmployee(status,user);
+//            return list.stream().map(taskMapper::convertToDto).collect(Collectors.toList());
+//        }
+
+        @Override
+        public List<TaskDTO> readAllByEmployee(User assignedEmployee) {
+            List<Task> tasks = taskRepository.findAllByAssignedEmployee(assignedEmployee);
+            return tasks.stream().map(obj-> mapperUtil.convert(obj,new TaskDTO())).collect(Collectors.toList());
         }
     }
-
-    @Override
-    public void delete(long id) {
-        Optional<Task> foundTask =  taskRepository.findById(id);
-        if(foundTask.isPresent()){
-            foundTask.get().setIsDeleted(true);
-            taskRepository.save(foundTask.get());
-        }
-    }
-
-    @Override
-    public int totalNonCompletedTasks(String projectCode) {
-        return taskRepository.totalNonCompletedTasks(projectCode);
-    }
-
-    @Override
-    public int totalCompletedTasks(String projectCode) {
-        return taskRepository.totalCompletedTasks(projectCode);
-    }
-
-    @Override
-    public void deleteByProject(ProjectDTO project) {
-
-        List<TaskDTO> taskDTOS = listAllByProject(project);
-        taskDTOS.forEach(taskDTO -> delete(taskDTO.getId()));
-    }
-
-
-    public List<TaskDTO> listAllByProject(ProjectDTO project){
-
-        List<Task> list = taskRepository.findAllByProject(projectMapper.convertToEntity(project));
-
-        return list.stream().map(obj -> {
-            return taskMapper.convertToDto(obj);
-        }).collect(Collectors.toList());
-    }
-
-    @Override
-    public List<TaskDTO> listAllTasksByStatusIsNot(Status status) {
-
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUserName(username);
-        List<Task> list = taskRepository.findAllByTaskStatusIsNotAndAssignedEmployee(status,user);
-        return list.stream().map(taskMapper::convertToDto).collect(Collectors.toList());
-    }
-
-    @Override
-    public List<TaskDTO> listAllTasksByProjectManager() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUserName(username);
-        List<Task> tasks = taskRepository.findAllByProjectAssignedManager(user);
-        return tasks.stream().map(taskMapper::convertToDto).collect(Collectors.toList());
-    }
-
-    @Override
-    public void updateStatus(TaskDTO dto) {
-        Optional<Task> task = taskRepository.findById(dto.getId());
-
-        if(task.isPresent()){
-            task.get().setTaskStatus(dto.getTaskStatus());
-            taskRepository.save(task.get());
-        }
-    }
-
-    @Override
-    public List<TaskDTO> listAllTasksByStatus(Status status) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUserName(username);
-        List<Task> list = taskRepository.findAllByTaskStatusAndAssignedEmployee(status,user);
-        return list.stream().map(taskMapper::convertToDto).collect(Collectors.toList());
-    }
-
-    @Override
-    public List<TaskDTO> readAllByEmployee(User assignedEmployee) {
-        List<Task> tasks = taskRepository.findAllByAssignedEmployee(assignedEmployee);
-        return tasks.stream().map(taskMapper::convertToDto).collect(Collectors.toList());
-    }
-}

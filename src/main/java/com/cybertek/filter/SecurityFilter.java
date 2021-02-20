@@ -22,7 +22,7 @@ public class SecurityFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final SecurityService securityService;
 
-    public SecurityFilter(JwtUtil jwtUtil, @Lazy SecurityService securityService) {
+    public SecurityFilter(JwtUtil jwtUtil, SecurityService securityService) {
         this.jwtUtil = jwtUtil;
         this.securityService = securityService;
     }
@@ -30,16 +30,20 @@ public class SecurityFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest httpServletRequest,
                                     HttpServletResponse httpServletResponse,
                                     FilterChain filterChain) throws ServletException, IOException {
+
         String authorizationHeader = httpServletRequest.getHeader("Authorization");
         String token = null;
         String username = null;
+
         if (authorizationHeader != null) {
             token = authorizationHeader.replace("Bearer","");
-            username = jwtUtil.extractUserName(token);
+            username = jwtUtil.extractUsername(token);
         }
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = securityService.loadUserByUsername(username);
+
             if (jwtUtil.validateToken(token, userDetails) && checkIfUserIsValid(username)) {
+
                 UsernamePasswordAuthenticationToken currentUser =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 currentUser
@@ -48,10 +52,13 @@ public class SecurityFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(httpServletRequest, httpServletResponse);
+
+
+
     }
 
     private boolean checkIfUserIsValid(String username) {
         User currentUser = securityService.loadUser(username);
-        return currentUser != null && currentUser.isEnabled();
+        return currentUser != null && currentUser.getEnabled();
     }
 }

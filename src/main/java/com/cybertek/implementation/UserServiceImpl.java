@@ -14,10 +14,15 @@ import com.cybertek.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -51,21 +56,26 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void save(UserDTO dto) {
+    public UserDTO save(UserDTO dto) throws TicketingProjectException {
 
         User foundUser = userRepository.findByUserName(dto.getUserName());
-        dto.setEnabled(true);
-
-       User obj =  mapperUtil.convert(dto,new User());
-       obj.setPassWord(passwordEncoder.encode(obj.getPassWord()));
-       userRepository.save(obj);
+        if(foundUser!=null){
+            throw new TicketingProjectException("User already exist");
+        }
+       User user =  mapperUtil.convert(dto,new User());
+       user.setPassWord(passwordEncoder.encode(user.getPassWord()));
+       User save =userRepository.save(user);
+       return mapperUtil.convert(save,new UserDTO());
     }
 
     @Override
-    public UserDTO update(UserDTO dto) {
+    public UserDTO update(UserDTO dto) throws TicketingProjectException, AccessDeniedException {
 
         //Find current user
         User user = userRepository.findByUserName(dto.getUserName());
+        if(user == null){
+            throw new TicketingProjectException("User Does Not Exists");
+        }
         //Map update user dto to entity object
         User convertedUser = mapperUtil.convert(dto,new User());
         convertedUser.setPassWord(passwordEncoder.encode(convertedUser.getPassWord()));
@@ -73,6 +83,10 @@ public class UserServiceImpl implements UserService {
 
         //set id to the converted object
         convertedUser.setId(user.getId());
+        if(!user.getEnabled()){
+            throw new TicketingProjectException("User is not confirmed");
+        }
+        checkForAuthoryties(user);
         //save updated user
         userRepository.save(convertedUser);
 
@@ -123,5 +137,23 @@ public class UserServiceImpl implements UserService {
             default:
                 return true;
         }
+    }
+
+    @Override
+    public UserDTO confirm(User user) {
+        user.setEnabled(true);
+        User confiirmedUser = userRepository.save(user);
+
+        return mapperUtil.convert(confiirmedUser,new UserDTO());
+    }
+
+    private void checkForAuthoryties(User user) throws AccessDeniedException {
+final Authentication authentication= SecurityContextHolder.getContext().getAuthentication();
+if(authentication!=null && !authentication.getName().equals("anonymousUser")){
+    Set<String>roles= AuthorityUtils.authorityListToSet(authentication.getAuthorities());
+    if(!(authentication.getName().equals(user.getId().toString()) || roles.contains("Admin"))){
+        throw new AccessDeniedException("Access denied");
+    }
+}
     }
 }
