@@ -1,7 +1,7 @@
 app:
   local-url: http://localhost:${server.port}
 server:
-  port: 8080
+  port: 9090
 spring:
   application:
     name: ticketing-project-rest

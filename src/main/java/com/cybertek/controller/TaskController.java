@@ -40,7 +40,7 @@ public class TaskController {
     public ResponseEntity<ResponseWrapper>readAll(){
         return ResponseEntity.ok(new ResponseWrapper("Successfully read all tasks"));
     }
-    @GetMapping("/{project-manager}")
+    @GetMapping("/project-manager")
     @DefaultExceptionMessage(defaultMessage ="Something went wrong please try again ")
     @Operation(summary = "Read all tasks by project manager")
     @PreAuthorize("hasAuthority('Manager')")

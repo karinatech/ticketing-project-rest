@@ -1,6 +1,7 @@
 package com.cybertek.controller;
 
 import com.cybertek.annotation.DefaultExceptionMessage;
+import com.cybertek.annotation.ExecutionTimeAnnotation;
 import com.cybertek.dto.MailDTO;
 import com.cybertek.dto.UserDTO;
 import com.cybertek.entity.ConfirmationTokn;
@@ -42,6 +43,7 @@ public class LoginController {
 	@PostMapping("/authenticate")
 	@DefaultExceptionMessage(defaultMessage = "Bad credentials")
 	@Operation(summary = "Login to authenticate")
+	@ExecutionTimeAnnotation
 public ResponseEntity<ResponseWrapper>doLogin(@RequestBody AuthenticationRequest authenticationRequest) throws TicketingProjectException {
 	String password=authenticationRequest.getPassword();
 	String username=authenticationRequest.getUsername();
@@ -51,7 +53,7 @@ public ResponseEntity<ResponseWrapper>doLogin(@RequestBody AuthenticationRequest
 		UserDTO foundUser=userService.findByUserName(username);
 		User convertedUser=mapperUtil.convert(foundUser,new User());
 		if(!foundUser.isEnabled()){
-			throw new TicketingProjectException("Please veriify your user!");
+			throw new TicketingProjectException("Please verify your user!");
 		}
 		String jwtToken= jwtUtil.generateToken(convertedUser);
 		return ResponseEntity.ok(new ResponseWrapper("Login successful",jwtToken));
@@ -59,7 +61,7 @@ public ResponseEntity<ResponseWrapper>doLogin(@RequestBody AuthenticationRequest
 }
 
 	@GetMapping("/confirmation")
-	@DefaultExceptionMessage(defaultMessage = "Failed top conmfirm email please try again ")
+	@DefaultExceptionMessage(defaultMessage = "Failed to confirm email please try again ")
 	@Operation(summary = "Confirm account")
 public ResponseEntity<ResponseWrapper>confirmEmail(@RequestParam("token") String token) throws TicketingProjectException {
 		ConfirmationTokn confirmationTokn= confirmationTokenService.readByToken(token);
