@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 @Tag(name = "User Controller",description = "User API")
 public class ProjectController {
 
-
     private ProjectService projectService;
     private UserService userService;
 
@@ -72,7 +71,7 @@ public class ProjectController {
         ProjectDTO project=projectService.update(projectDTO);
         return ResponseEntity.ok(new ResponseWrapper("Project is retrieved",project));
     }
-    @DeleteMapping
+    @DeleteMapping("/{projectcode}")
     @Operation(summary = "Delete project")
     @DefaultExceptionMessage(defaultMessage = "Fail to delete the project")
     @PreAuthorize("hasAnyAuthority('Admin', 'Manager')")
@@ -99,6 +98,7 @@ public class ProjectController {
        List <ProjectDTO> projectDTOs = projectService.listAllProjectDetails();
         return ResponseEntity.ok(new ResponseWrapper("Project is completed",projectDTOs));
     }
+
 
 }
 
